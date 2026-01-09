@@ -1,0 +1,20 @@
+{
+  "name": "looky-js",
+  "version": "1.0.0",
+  "description": "A basic webpage project using three.js",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "serve": "^14.2.0",
+    "three": "^0.157.0"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^7.3.1"
+  }
+}
