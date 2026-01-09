@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
 const pointer = new THREE.Vector2();
 let renderBlock;
@@ -30,14 +30,20 @@ renderBlock.addEventListener( 'pointermove', onPointerMove );
 
 const geometry = new THREE.BoxGeometry();
 const material = new THREE.MeshPhongMaterial( { map: map, side: THREE.DoubleSide } );
-const cube = new THREE.InstancedMesh(geometry, material, 10);
+// Grid instancing: 15 per row, 4 rows
+const COLS = 15;
+const ROWS = 4;
+const INSTANCE_COUNT = COLS * ROWS;
+const cube = new THREE.InstancedMesh(geometry, material, INSTANCE_COUNT);
+cube.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 
-const testpoint = new THREE.SphereGeometry(.1, 10, 10);
-const sphere = new THREE.Mesh(testpoint, material);
+//const testpoint = new THREE.SphereGeometry(.1, 10, 10);
+//const sphere = new THREE.Mesh(testpoint, material);
 scene.add(cube);
-scene.add(sphere);
+//scene.add(sphere);
 
-camera.position.z = 10;
+camera.position.z = 5;
+
 
 function onPointerMove( event ) {
     // Calculate pointer position in normalized device coordinates (-1 to +1)
@@ -52,30 +58,37 @@ let sphereposition = new THREE.Vector3();
 
 
 
-let boxpositions = [];
 
-for (let i = -1; i < 2; i++) {
-  for (let j = -1; j < 2; j++) {
-    boxpositions.push(new THREE.Matrix3(i,j,0));
+// Prepare a reusable Object3D for setting per-instance transforms
+const tempObj = new THREE.Object3D();
 
-  }
-}
+// spacing and offsets to center the grid
+const spacingX = 1.2;
+const spacingY = 1.2;
+const offsetX = (COLS - 1) * spacingX * 0.5;
+const offsetY = (ROWS - 1) * spacingY * 0.5;
 
-boxpositions.forEach((m, index) => {
-  cube.setMatrixAt(index, m);
-
-});
-
-cube.computeBoundingBox();
+// Store positions logically by index (row-major) via computed math in animate
 
 function animate() {
   raycaster.setFromCamera( pointer, camera );
   requestAnimationFrame(animate);
-  cube.rotation.x += 0.01;
-  cube.rotation.y += 0.01;
+  // Update sphere position in front of the ray
   sphereposition = raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(2));
-  sphere.position.copy(sphereposition);
-  cube.lookAt(sphereposition);
+  //sphere.position.copy(sphereposition);
+
+  // Update each instance so it faces the sphere position
+  for (let i = 0; i < INSTANCE_COUNT; i++) {
+    const col = i % COLS;
+    const row = Math.floor(i / COLS);
+    const x = col * spacingX - offsetX;
+    const y = offsetY - row * spacingY;
+    tempObj.position.set(x, y, 0);
+    tempObj.lookAt(sphereposition);
+    tempObj.updateMatrix();
+    cube.setMatrixAt(i, tempObj.matrix);
+  }
+  cube.instanceMatrix.needsUpdate = true;
   
   renderer.render(scene, camera);
 
