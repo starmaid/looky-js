@@ -1,7 +1,8 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
 const pointer = new THREE.Vector2();
 let renderBlock;
@@ -12,6 +13,43 @@ scene.add( ambientLight );
 const pointLight = new THREE.PointLight( 0xffffff, 2.5, 0, 0 );
 camera.add( pointLight );
 scene.add( camera );
+
+
+const loader = new GLTFLoader();
+let model = null;
+loader.load( 'models/tim1_3.glb', function ( gltf ) {
+
+  model = gltf.scene;
+  // Find the first mesh inside the glTF to use as the instanced source
+  let sourceMesh = null;
+  model.traverse( function ( object ) {
+    if ( object.isMesh ) {
+      if ( !sourceMesh ) sourceMesh = object;
+      object.castShadow = true;
+    }
+  } );
+
+  if ( sourceMesh ) {
+    let srcGeometry = sourceMesh.geometry;
+    let srcMaterial = sourceMesh.material;
+    if ( Array.isArray(srcMaterial) ) srcMaterial = srcMaterial[0];
+
+    // Create an InstancedMesh directly from the model mesh and use it for the grid
+    const newInstanced = new THREE.InstancedMesh(srcGeometry, srcMaterial, INSTANCE_COUNT);
+    newInstanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(newInstanced);
+    cube = newInstanced;
+  } else {
+    // Fallback: if no single mesh found, add the group to the scene
+    scene.add(model);
+  }
+
+}, undefined, function ( error ) {
+  console.error( 'Error loading GLTF model:', error );
+} );
+
+
+
 
 
 const map = new THREE.TextureLoader().load( 'static/uv_grid_opengl.jpg' );
@@ -34,12 +72,10 @@ const material = new THREE.MeshPhongMaterial( { map: map, side: THREE.DoubleSide
 const COLS = 15;
 const ROWS = 4;
 const INSTANCE_COUNT = COLS * ROWS;
-const cube = new THREE.InstancedMesh(geometry, material, INSTANCE_COUNT);
-cube.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+let cube = null;
 
 //const testpoint = new THREE.SphereGeometry(.1, 10, 10);
 //const sphere = new THREE.Mesh(testpoint, material);
-scene.add(cube);
 //scene.add(sphere);
 
 camera.position.z = 5;
@@ -63,8 +99,8 @@ let sphereposition = new THREE.Vector3();
 const tempObj = new THREE.Object3D();
 
 // spacing and offsets to center the grid
-const spacingX = 1.2;
-const spacingY = 1.2;
+const spacingX = .85;
+const spacingY = 1.1;
 const offsetX = (COLS - 1) * spacingX * 0.5;
 const offsetY = (ROWS - 1) * spacingY * 0.5;
 
@@ -85,10 +121,12 @@ function animate() {
     const y = offsetY - row * spacingY;
     tempObj.position.set(x, y, 0);
     tempObj.lookAt(sphereposition);
+    tempObj.rotateX(Math.PI / 2); // Adjust orientation if needed
     tempObj.updateMatrix();
-    cube.setMatrixAt(i, tempObj.matrix);
+    tempObj.scale.set(2, 2, 2); // Uniform scale for all instances
+    if (cube) cube.setMatrixAt(i, tempObj.matrix);
   }
-  cube.instanceMatrix.needsUpdate = true;
+  if (cube) cube.instanceMatrix.needsUpdate = true;
   
   renderer.render(scene, camera);
 
